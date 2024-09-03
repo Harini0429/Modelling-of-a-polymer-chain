@@ -1,51 +1,71 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+def simulate_two_particles(T_s=10000, dt_s=0.001, nu=500, bk =10**-9):
+    N = int(T_s / dt_s)
+    
+    # Initialize position vectors
+    r1 = np.zeros((N, 3))
+    r2 = np.zeros((N, 3))
+
+    # Set initial positions
+    r1[0] = [0, 0, 0]
+    r2[0] = [np.sqrt(nu), 0, 0]
+
+    # Precompute constants
+   # sqrt6_dt_s = np.sqrt(6 * dt_s)
+   # inv_nu_bk = 1 / (nu * bk)
+
+    for i in range(1, N):
+        
+        R_star = r2[i-1] - r1[i-1]
+        r_c = np.linalg.norm(R_star) * (1/(nu*bk))
+
+        n1 = np.random.uniform(0, 1, 3)
+        n2 = np.random.uniform(0, 1, 3)
+
+        # Update positions
+        r1[i] = r1[i-1] + np.sqrt(6 * dt_s) * n1 + ((3 - r_c**2) / (nu * (1 - r_c**2))) * R_star* dt_s
+        r2[i] = r2[i-1] + np.sqrt(6 * dt_s) * n2 - ((3 - r_c**2) / (nu * (1 - r_c**2))) * R_star* dt_s
+
+        # Compute updated R_v
+        R_star = r2[i] - r1[i]
+        r_c = np.linalg.norm(R_star) * (1/nu*bk)
+
+    return r1, r2
+
+def calculate_R_end(r1, r2, dt_interval=10):
+    N = len(r1)
+    R_end = np.zeros(N // dt_interval)
+    times = np.zeros(N // dt_interval)
+
+    for i in range(len(R_end)):
+        index = (i + 1) * dt_interval - 1
+        R_v = r2[index] - r1[index]
+        R_end[i] = np.linalg.norm(R_v)
+        times[i] = index * dt_s
+
+    return times, R_end
+
 # Parameters
-v = 500                # Given parameter v
-delta_t_star = 0.001   # Non-dimensional time step
-total_time_star = 10000  # Total time for the simulation
-num_steps = int(total_time_star / delta_t_star)  # Number of time steps
+T_s = 10000
+dt_s = 0.001
+dt_interval = 10
 
-# Initial conditions
-r1_star = np.array([0.0, 0.0])  # Initial position of the first bead
-r2_star = np.array([np.sqrt(v), 0.0])  # Initial position of the second bead
 
-# Store the end-to-end distance for plotting
-R_end_star = np.zeros(num_steps)
+r1, r2 = simulate_two_particles(T_s, dt_s)
 
-# Random noise
-noise_strength = np.sqrt(6 * delta_t_star)
+# Calculate R_end and its RMS value
+times, R_end = calculate_R_end(r1, r2, dt_interval)
+R_end_rms = np.sqrt(np.mean(R_end**2))
 
-# Simulation loop
-for t in range(num_steps):
-    # Generate random noise
-    n1 = np.random.normal(0, 1, 2)
-    n2 = np.random.normal(0, 1, 2)
-    
-    # Calculate the vector R_star between the beads
-    R_star = r2_star - r1_star
-    R_star_mag = np.linalg.norm(R_star)
-    
-    # Update positions based on the equations of motion
-    r1_star += noise_strength * n1 + delta_t_star * (-3 * R_star / (1 - R_star_mag**2) / R_star_mag)
-    r2_star += noise_strength * n2 + delta_t_star * (3 * R_star / (1 - R_star_mag**2) / R_star_mag)
-    
-    # Store the magnitude of the end-to-end vector
-    R_end_star[t] = np.linalg.norm(R_star)
-
-# Calculate RMS value
-R_end_rms = np.sqrt(np.mean(R_end_star ** 2))
-
-# Plot the end-to-end distance as a function of time
-time_star = np.arange(0, total_time_star, delta_t_star)
-plt.plot(time_star, R_end_star, label="End-to-End Distance", color='blue')
-
-# Plot the RMS value as a horizontal line
-plt.axhline(y=R_end_rms, color='red', linestyle='-', linewidth=2, label=f'RMS Value: {R_end_rms:.2f}')
-
-plt.xlabel('Non-dimensional Time t*')
-plt.ylabel('End-to-End Distance R*')
-plt.title('Brownian Dynamics Simulation of a Polymer Chain')
+# Plot R_end vs. t_s
+plt.figure(figsize=(10, 6))
+plt.plot(times, R_end, 'b-', label='R_end')
+plt.axhline(y=R_end_rms, color='k', linestyle='-', label=f'RMS = {R_end_rms:.4f}')
+plt.xlabel('Time (s)')
+plt.ylabel('Magnitude of R_v')
+plt.title('Magnitude of R_v vs Time')
 plt.legend()
+plt.grid(True)
 plt.show()
